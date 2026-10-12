@@ -1,0 +1,16 @@
+# `docker compose up` prints the demo: sample data and all four reports, no credentials.
+# For real use: docker compose run --rm finops sync, then … finops report reconcile
+services:
+  finops:
+    build: .
+    env_file: [{ path: .env, required: false }]
+    volumes:
+      - finops-data:/srv/data            # the local store
+      - ./config:/srv/config:ro          # edit the config on the host
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+
+volumes:
+  finops-data:

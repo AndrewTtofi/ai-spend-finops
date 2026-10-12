@@ -1,0 +1,54 @@
+name: reports
+# The tool on a schedule: sync every morning and alert on what changed, and on the 1st
+# write last month's reconciliation and the seat true-up as an artifact.
+#
+# Needs repository secrets ANTHROPIC_ADMIN_KEY, OPENAI_ADMIN_KEY, OKTA_ORG_URL,
+# OKTA_API_TOKEN and SLACK_WEBHOOK_URL. A source without its secret is skipped, so this
+# is safe to leave enabled before they are set. The local store is kept between runs in
+# the Actions cache; a durable deployment would keep it on a disk or in a bucket.
+on:
+  schedule: [{ cron: "23 6 * * *" }]   # 06:23 UTC daily
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency: { group: reports, cancel-in-progress: false }
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      ANTHROPIC_ADMIN_KEY: ${{ secrets.ANTHROPIC_ADMIN_KEY }}
+      OPENAI_ADMIN_KEY: ${{ secrets.OPENAI_ADMIN_KEY }}
+      OKTA_ORG_URL: ${{ secrets.OKTA_ORG_URL }}
+      OKTA_API_TOKEN: ${{ secrets.OKTA_API_TOKEN }}
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with: { python-version: "3.12", cache: pip, cache-dependency-path: requirements.txt }
+      - run: pip install --require-hashes -r requirements.txt && pip install --no-deps .
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: data
+          key: finops-store-${{ github.run_id }}
+          restore-keys: finops-store-
+      - run: finops sync
+      - name: alerts (each finding is sent once)
+        run: |
+          finops report anomalies --notify
+          finops report caps --notify
+      - name: month-end reports (on the 1st, or when run by hand)
+        run: |
+          if [ "$(date -u +%d)" = "01" ] || [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            mkdir -p reports
+            last_month="$(date -u -d "$(date -u +%Y-%m-01) -1 day" +%Y-%m)"
+            finops report reconcile --month "$last_month" > "reports/reconcile-$last_month.md"
+            finops report seats --notify > "reports/seats-$(date -u +%Y-%m-%d).md"
+          fi
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: hashFiles('reports/*.md') != ''
+        with: { name: finops-reports, path: reports/, retention-days: 90 }
