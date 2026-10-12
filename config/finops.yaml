@@ -1,0 +1,48 @@
+# AI spend and seat FinOps: the decisions the reports are measured against.
+# Change it in a pull request. `finops check-config` validates it, and CI runs that.
+# The figures are examples.
+
+# What was committed to each vendor per month. It is paid whether it is used or not, so
+# both directions matter: unused commitment is waste, and overage is unbudgeted.
+vendors:
+  anthropic: { commitment_usd_per_month: 6000 }
+  openai:    { commitment_usd_per_month: 3000 }
+
+# Who owns which spend. The key is the vendor's own grouping: an Anthropic workspace id
+# or an OpenAI project id ("default" is the vendor's default workspace or project).
+# Spend in a scope that isn't listed is reported as unallocated, by name.
+owners:
+  anthropic:
+    wrkspc_eng: eng-backend
+    wrkspc_compliance: compliance
+  openai:
+    proj_trading: trading-desk
+    proj_research: research
+
+# Monthly caps per tier: a warning at the soft cap, and the cap itself.
+tiers:
+  standard: { soft_usd: 3500, hard_usd: 5000 }
+  small:    { soft_usd: 500,  hard_usd: 600 }
+
+teams:
+  eng-backend:  { tier: standard }
+  trading-desk: { tier: standard }
+  compliance:   { tier: small }
+  research:     { tier: small }
+
+# Paid seats. Membership of the identity-provider group is what holds the seat; use of
+# the product named by `activity` is what counts as using it.
+seats:
+  inactive_days: 45   # unused this long: a candidate to reclaim
+  grace_days: 14      # a newly assigned seat is not judged before this
+  plans:
+    claude-team:
+      usd_per_seat_month: 30
+      okta_group_id: 00g1exampleGROUPid
+      activity: claude_code
+
+# A day's spend is an anomaly when it is this far above the same team's own recent days.
+anomalies:
+  baseline_days: 14
+  threshold: 3.5   # robust z-score: about 3.5 standard deviations
+  min_usd: 25      # ignore jumps smaller than this, however unusual
