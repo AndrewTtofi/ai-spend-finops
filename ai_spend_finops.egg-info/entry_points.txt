@@ -1,0 +1,2 @@
+[console_scripts]
+finops = finops.cli:main

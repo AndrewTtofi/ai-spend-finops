@@ -1,0 +1,8 @@
+Metadata-Version: 2.4
+Name: ai-spend-finops
+Version: 0.1.0
+Summary: AI spend and seat FinOps: vendor cost reconciliation, caps, anomaly alerts and seat true-ups.
+License-Expression: MIT
+Requires-Python: >=3.12
+License-File: LICENSE
+Dynamic: license-file
